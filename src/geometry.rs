@@ -1,4 +1,4 @@
-use std::hash::{Hash, Hasher};
+use crate::TriangulationError;
 
 #[derive(Copy, Clone, Debug, Eq)]
 pub struct Triangle {
@@ -19,29 +19,41 @@ impl Triangle {
     pub fn a(&self) -> Point { self.a }
     pub fn b(&self) -> Point { self.b }
     pub fn c(&self) -> Point { self.c }
-
-    pub(crate) fn circumcircle_contains_point(&self, point: &Point) -> bool {
-        let ax = (self.a.x() - point.x()) as f32;
-        let ay = (self.a.y() - point.y()) as f32;
-
-        let bx = (self.b.x() - point.x()) as f32;
-        let by = (self.b.y() - point.y()) as f32;
-
-        let cx = (self.c.x() - point.x()) as f32;
-        let cy = (self.c.y() - point.y()) as f32;
-
-        let a_sq = ax * ax + ay * ay;
-        let b_sq = bx * bx + by * by;
-        let c_sq = cx * cx + cy * cy;
-
-        let determinant = ax * (by * c_sq - cy * b_sq) -
-            ay * (bx * c_sq - cx * b_sq) +
-            a_sq * (bx * cy - cx * by);
-        determinant <= 0.0
-    }
-
     pub fn edges(&self) -> [Edge; 3] {
         [Edge::new(self.a, self.b), Edge::new(self.b, self.c), Edge::new(self.c, self.a)]
+    }
+    pub(crate) fn point_in_circumcircle(&self, point: &Point) -> Result<bool, TriangulationError> {
+        if let Ok(((ux, uy), r)) = self.circumcircle() {
+            let dx = point.x() as f64 - ux;
+            let dy = point.y() as f64 - uy;
+
+            let distance = (dx * dx + dy * dy).sqrt();
+
+            Ok(distance <= r)
+        } else {
+            Err(TriangulationError)
+        }
+    }
+
+    pub(crate) fn circumcircle(&self) -> Result<((f64, f64), f64), TriangulationError> {
+        let ax = self.a.x() as f64;
+        let ay = self.a.y() as f64;
+        let bx = self.b.x() as f64;
+        let by = self.b.y() as f64;
+        let cx = self.c.x() as f64;
+        let cy = self.c.y() as f64;
+
+        let d = 2.0 * (ax * (by - cy) + bx * (cy - ay) + cx * (ay - by));
+
+        if d == 0.0 {
+            return Err(TriangulationError);
+        }
+
+        let ux = ((ax * ax + ay * ay) * (by - cy) + (bx * bx + by * by) * (cy - ay) + (cx * cx + cy * cy) * (ay - by)) / d;
+        let uy = ((ax * ax + ay * ay) * (cx - bx) + (bx * bx + by * by) * (ax - cx) + (cx * cx + cy * cy) * (bx - ax)) / d;
+        let r = ((ax - ux).powi(2) + (ay - uy).powi(2)).sqrt();
+
+        Ok(((ux, uy), r))
     }
 
     pub(crate) fn contains_edge(&self, other_edge: &Edge) -> bool {
@@ -50,6 +62,7 @@ impl Triangle {
                 return true;
             }
         }
+
         false
     }
 }
@@ -68,16 +81,7 @@ impl PartialEq for Triangle {
     }
 }
 
-impl Hash for Triangle {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.a.hash(state);
-        self.b.hash(state);
-        self.c.hash(state);
-    }
-}
-
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Point {
     x: i32,
     y: i32,
@@ -93,7 +97,7 @@ impl Point {
     pub fn y(&self) -> i32 { self.y }
 }
 
-#[derive(Copy, Clone, Debug, Eq)]
+#[derive(Copy, Clone, Debug)]
 pub struct Edge {
     a: Point,
     b: Point,
@@ -113,12 +117,5 @@ impl Edge {
 impl PartialEq for Edge {
     fn eq(&self, other: &Self) -> bool {
         self.a == other.a && self.b == other.b || self.a == other.b && self.b == other.a
-    }
-}
-
-impl Hash for Edge {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.a.hash(state);
-        self.b.hash(state);
     }
 }
