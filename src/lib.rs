@@ -1,6 +1,6 @@
-mod delaunay;
-mod geometry;
-mod voronoi;
+pub mod delaunay;
+pub mod geometry;
+pub mod voronoi;
 
 #[derive(Clone, Debug)]
 pub struct TriangulationError;
@@ -10,4 +10,3 @@ impl std::fmt::Display for TriangulationError {
         write!(f, "DelaunayError occurred")
     }
 }
-
